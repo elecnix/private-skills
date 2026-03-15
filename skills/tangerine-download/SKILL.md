@@ -1,201 +1,168 @@
 ---
 name: tangerine-download
-description: Download Tangerine transaction exports safely via direct URL extraction or UI flow, and rename/move CSV files into organized finance folders.
+description: Download Tangerine transaction exports via direct URL API, organized as monthly CSV files per account.
 ---
 
 # Tangerine transaction download workflow
 
-Use this skill when the user wants to download Tangerine transaction exports (credit cards, checking, savings) and organize them locally.
+Use this skill to download monthly Tangerine transaction CSVs for any account type (checking, savings, credit cards) and organize them into date-named folders.
 
 ## Related skill
 
-Use the Chrome CDP skill for browser control and inspection:
-- `/home/nicolas/.pi/agent/git/github.com/pasky/chrome-cdp-skill/skills/chrome-cdp/SKILL.md`
+- Chrome CDP skill: `/home/nicolas/.pi/agent/git/github.com/pasky/chrome-cdp-skill/skills/chrome-cdp/SKILL.md`
 
-## Account types and download methods
+## Key finding: direct URL works for ALL accounts
 
-### Credit cards (CREDITLINE)
-- **Direct URL works** - can use programmatic `<a>` element clicks
-- Has billing cycle dropdown with date ranges
-- Filename pattern: `5360 xxxx  xxxx XXXX.CSV`
-- Use statement period naming: `YYYY-MM-DD.csv` (endDate from URL)
+The direct download API works for **all account types** when using `acctType=SAVINGS`:
 
-### Checking accounts (CHEQUING)
-- **Direct URL does NOT work** - must use UI download flow
-- No billing cycle dropdown
-- Filename pattern: `<Account Nickname>.CSV`
-- Use: `<Nickname> <Last4Digits>.csv`
+```
+https://secure.tangerine.ca/web/rest/v1/accounts/downloads?
+  ac=<PREFIX><ACCOUNT_TOKEN>&
+  fileType=CSV&
+  language=fra&
+  acctType=SAVINGS&    ← Use SAVINGS for checking AND savings accounts!
+  acctName=<DISPLAY_NAME>&
+  startDate=<YYYYMMDD>&
+  endDate=<YYYYMMDD>
+```
 
-### Savings accounts (SAVINGS)
-- **Direct URL does NOT work** - must use UI download flow
-- No billing cycle dropdown
-- Filename pattern: `<Account Nickname>.CSV`
-- Use: `<Nickname> <Last4Digits>.csv`
+- `ac` = `31323334353637383930313233343536` + 64-char hex token (checking/savings) or 96-char (credit cards)
+- `acctType=SAVINGS` works for both CHEQUING and SAVINGS account types
+- `acctType=CREDITLINE` for credit cards
+- `acctName` = account nickname (e.g., "Nicolas 166") or display name (e.g., "5360 xxxx xxxx 8499")
+- `startDate`/`endDate` = exclusive date range in `YYYYMMDD` format
+- Response: 200 with CSV data if transactions exist, 204 No Content if empty
 
-## Getting account information
+## Getting account tokens
 
-Use the PFM API to discover all accounts:
+Use the PFM API (requires browser cookies/session):
 
 ```javascript
 fetch('https://secure.tangerine.ca/web/rest/pfm/v1/accounts', {credentials: 'include'})
   .then(r => r.json())
   .then(d => d.accounts.map(a => ({
     nickname: a.nickname,
-    number: a.number,
+    number: a.number,  // Full ac token
     displayName: a.display_name,
     type: a.type
   })))
 ```
 
-This returns all accounts with their ac tokens (in the `number` field, format: `31323334353637383930313233343536<HEX_TOKEN>`).
+The `number` field is the full `ac` parameter value.
 
-### Known accounts (as of March 2025)
+## Downloading monthly files via browser fetch
 
-| Nickname | Last 4 | Type | Target Folder |
-|----------|--------|------|---------------|
-| Nicolas 166 | 8166 | CHEQUING | Banque/Tangerine/ |
-| Dépenses variables | 8227 | CHEQUING | Banque/Tangerine/ |
-| Épargne | 7270 | SAVINGS | Banque/Tangerine/ |
-| Vacances | 9143 | SAVINGS | Banque/Tangerine/ |
-| Nicolas | 2609 | SAVINGS | Banque/Tangerine/ |
-| Étincelles | 0728 | SAVINGS | Banque/Tangerine/ |
-| Maëva | 5130 | SAVINGS | Banque/Tangerine/ |
-| Coralie | 5161 | SAVINGS | Banque/Tangerine/ |
-| World Mastercard Remises | 8499 | CREDIT_CARD | Cartes de crédit/MC Tangerine.../ |
-| World Mastercard Remises | 1194 | CREDIT_CARD | Cartes de crédit/MC Tangerine.../ |
+Since the API requires authentication cookies, fetch from within the Tangerine browser tab:
 
-## Direct URL (credit cards only)
-
-```
-https://secure.tangerine.ca/web/rest/v1/accounts/downloads?
-  ac=<TOKEN>&
-  fileType=CSV&
-  language=fra&
-  acctType=CREDITLINE&
-  acctName=<URL_ENCODED_DISPLAY_NAME>&
-  startDate=<YYYYMMDD>&
-  endDate=<YYYYMMDD>
+```javascript
+(async () => {
+  const BASE = "https://secure.tangerine.ca/web/rest/v1/accounts/downloads";
+  const params = new URLSearchParams({
+    ac: "<FULL_ACCOUNT_TOKEN>",
+    fileType: "CSV",
+    language: "fra",
+    acctType: "SAVINGS",  // or CREDITLINE for credit cards
+    acctName: "<ACCOUNT_NAME>",
+    startDate: "20250101",
+    endDate: "20250201"    // Exclusive: Jan 1-31
+  });
+  const resp = await fetch(BASE + "?" + params, {credentials: "include"});
+  const csvText = await resp.text();
+  // csvText contains the CSV data
+})();
 ```
 
-For credit cards, the `<ac>` token is 96 hex characters. The `endDate` is **exclusive** (one day after the last statement day).
+### Batch download pattern
 
-### Filename from URL
-- URL: `startDate=20250221&endDate=20250321`
-- Filename: `2025-03-21.csv`
+Fetch all months, store in window object, then extract:
 
-## UI download flow (all accounts)
+```javascript
+// 1. Fetch all months
+const months = [
+  ["20250101","20250201","2025-01"],
+  ["20250201","20250301","2025-02"],
+  // ... etc
+];
 
-This is the reliable method for checking/savings accounts:
+const results = [];
+for (const [start, end, label] of months) {
+  const r = await fetch(url, {credentials: "include"});
+  const t = await r.text();
+  if (t.trim().split("\n").length > 1) {  // Has data beyond header
+    results.push({file: label + ".csv", data: t});
+  }
+}
+window.__downloadResults = results;
 
-### Steps
+// 2. Extract each file via CDP eval and save via shell
+```
 
-1. Navigate to download page:
-   ```javascript
-   window.location.hash = '#/download-transactions';
-   ```
-   Or use `location.href` with the full URL. Wait 10-15 seconds for Angular to render.
+## Folder structure
 
-2. **Wait for mat-select elements** (Angular Material dropdowns):
-   ```javascript
-   document.querySelectorAll('mat-select').length  // Should be 2 for checking/savings, 3 for credit cards
-   ```
-   If 0, wait longer or hard-reload.
-
-3. **Select account** (first mat-select):
-   ```javascript
-   document.querySelector('#e-transfer-account').click();
-   // Wait 1s, then click the option:
-   document.querySelector('mat-option:nth-child(N)').click();
-   ```
-
-4. **Select format** (second mat-select, id=mat-select-0 or mat-select-2):
-   ```javascript
-   document.querySelectorAll('mat-select')[1].click();
-   // Wait 1s, then:
-   Array.from(document.querySelectorAll('mat-option'))
-     .find(o => o.textContent.includes('Excel'))?.click();
-   ```
-   **Important**: For credit cards, the format dropdown (mat-select-2) contains BOTH billing cycles AND format options. Select "Excel et autres logiciels" which appears at the END of the list.
-
-5. **For credit cards only**: Also select a billing cycle (mat-select-3):
-   ```javascript
-   document.querySelector('#mat-select-3').click();
-   // Select first option for most recent cycle
-   document.querySelector('mat-option').click();
-   ```
-
-6. **Click Télécharger**:
-   ```javascript
-   document.querySelector('button.mat-primary').click();
-   ```
-
-7. **Wait for completion** (2-5 seconds):
-   ```javascript
-   document.body.innerText.includes('Terminé')  // true when done
-   ```
-
-8. **Move file immediately**:
-   ```bash
-   mv ~/Téléchargements/<filename>.CSV /target/folder/<new-name>.csv
-   ```
-
-### Navigation gotchas
-
-- After download, the page shows "Terminé" completion state
-- **Hard reload is required** to reset the form: `location.reload(true)`
-- Then navigate: `location.href = 'https://www.tangerine.ca/app/#/download-transactions'`
-- Wait 15 seconds after reload before expecting the form to load
-- The Angular app caches state aggressively
-
-### Download behavior
-
-- Checking/savings "since last download" returns all transactions since account creation (or last download)
-- Credit cards need billing cycle selection
-- Download completes in 2-5 seconds typically
-- File appears in `~/Téléchargements/` with account-based name
-
-## Target folders
-
-- **Checking/Savings**: `/home/nicolas/Documents/Finances/Banque/Tangerine/`
-- **Credit cards**: `/home/nicolas/Documents/Finances/Cartes de crédit/MasterCard Tangerine Nicolas 4402,4130,4326,8499/2025`
+```
+/home/nicolas/Documents/Finances/Banque/Tangerine/
+├── Nicolas 166 8166/
+│   ├── 2025-01.csv
+│   ├── 2025-02.csv
+│   └── ...
+├── Dépenses variables 8227/
+│   ├── 2025-01.csv
+│   └── ...
+├── Épargne 7270/
+│   └── README.txt  (if no transactions)
+└── ...
+```
 
 ## Naming conventions
 
-### Credit cards
+### Folder: `<Nickname> <Last4Digits>`
+- `Nicolas 166 8166/`
+- `Dépenses variables 8227/`
+- `Épargne 7270/`
+- `World Mastercard 8499/` (for credit cards)
+
+### File: `YYYY-MM.csv`
+- Period: Jan 1-31 → `2025-01.csv`
+- Period: Feb 1-28 → `2025-02.csv`
+- Date range is exclusive endDate: `startDate=20250101&endDate=20250201` = January
+
+## Workflow summary
+
+1. Get account list via PFM API
+2. For each account, for each month:
+   - Fetch CSV via direct URL from browser
+   - If data exists (more than header), save to `<Folder>/<YYYY-MM>.csv`
+3. Empty accounts get a README.txt explaining no transactions
+
+## Date ranges for monthly downloads
+
+```python
+MONTHS = [
+    ("20250101", "20250201", "2025-01"),  # January 2025
+    ("20250201", "20250301", "2025-02"),  # February 2025
+    ("20250301", "20250401", "2025-03"),  # March 2025
+    # ... continue as needed
+]
 ```
-YYYY-MM-DD.csv  (statement period end date)
-```
 
-### Checking/Savings
-```
-<Nickname> <Last4Digits>.csv
-```
-Examples:
-- `Nicolas 166 8166.csv`
-- `Dépenses variables 8227.csv`
-- `Épargne 7270.csv`
+## Known accounts (as of March 2025)
 
-## Pre-download checklist
+| Nickname | Last 4 | Type | Token suffix |
+|----------|--------|------|--------------|
+| Nicolas 166 | 8166 | CHEQUING | 106d44b9... |
+| Dépenses variables | 8227 | CHEQUING | 31759a07... |
+| Épargne | 7270 | SAVINGS | 0e7763c2... |
+| Vacances | 9143 | SAVINGS | 5e175190... |
+| Nicolas | 2609 | SAVINGS | 5b918996... |
+| Étincelles | 0728 | SAVINGS | 342d5f9c... |
+| Maëva | 5130 | SAVINGS | db5f9c72... |
+| Coralie | 5161 | SAVINGS | dd37afa0... |
+| World MC Remises | 8499 | CREDIT_CARD | b7088e2f... |
+| World MC Remises | 1194 | CREDIT_CARD | 3bba3e9f... |
 
-1. Archive old CSVs from `~/Téléchargements`:
-   ```bash
-   mkdir -p ~/Téléchargements/tangerine_csv_archive_$(date +%Y%m%d)
-   mv ~/Téléchargements/*5360* ~/Téléchargements/*transactions* ~/Téléchargements/tangerine_csv_archive_*/
-   ```
+## Notes
 
-2. Ensure target folders exist:
-   ```bash
-   mkdir -p "/home/nicolas/Documents/Finances/Banque/Tangerine"
-   mkdir -p "/home/nicolas/Documents/Finances/Cartes de crédit/MasterCard Tangerine Nicolas 4402,4130,4326,8499/2025"
-   ```
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| 0 mat-selects found | Angular not loaded | Wait 15s, or hard-reload |
-| Page shows "Terminé" | Previous download cached | Hard-reload (`location.reload(true)`) |
-| Format dropdown has billing cycles | Credit card selected (has 3 selects) | Use mat-select-2, pick "Excel..." from end of list |
-| Download stuck "En traitement" | Format not selected | Cancel and retry with proper format selection |
-| Empty CSV | No new transactions since last download | Normal - move on to next account |
-| Session expired | Logged out | Ask user to log back in |
+- Don't sleep more than 5s between operations
+- Fetch + save approach is fastest (no UI interaction needed)
+- The API returns 204 No Content for months with no transactions
+- Credit cards use `acctType=CREDITLINE`, all others use `acctType=SAVINGS`
