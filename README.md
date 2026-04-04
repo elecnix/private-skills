@@ -1,29 +1,26 @@
-# Private Skills
+# Private Skills Repository
 
-Personal [Agent Skills](https://agentskills.io) for use with [Pi](https://github.com/badlogic/pi-coding-agent).
+This directory contains skills for personal use with the pi coding agent.
+
+## Structure
+
+```
+private-skills/
+├── skills/
+│   └── private-skills/
+│       └── SKILL.md              # The private-skills management guide
+└── README.md                     # This file
+```
 
 ## Skills
 
-| Skill | Description |
-|-------|-------------|
-| [tangerine-download](skills/tangerine-download/) | Download Tangerine bank transaction exports and organize them into finance folders |
+- **[private-skills](skills/private-skills/SKILL.md)** — Guide to creating and managing private skills
 
-## Usage
+## About
 
-Add this repo's `skills/` directory to your Pi settings:
+Private skills are custom skills stored locally in `~/.agents/skills/` rather than published to a public repository. This repo serves as a backup and organizational reference for my personal skill collection.
 
-```json
-{
-  "skills": ["~/Source/private-skills/skills"]
-}
-```
+## Quick Links
 
-Or use it from the CLI:
-
-```bash
-pi --skill ~/Source/private-skills/skills/tangerine-download
-```
-
-## License
-
-Private — not for redistribution.
+- [Managing Private Skills](skills/private-skills/SKILL.md) — Full guide
+- [Pi Skills Documentation](https://github.com/mariozechner/pi-coding-agent) — Official skill format

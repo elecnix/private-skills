@@ -1,6 +1,6 @@
 ---
 name: tangerine-download
-description: Download Tangerine transaction exports via direct URL API, organized as monthly CSV files per account.
+description: Download Tangerine transaction exports (checking, savings, credit cards) as monthly CSVs.
 ---
 
 # Tangerine transaction download workflow
@@ -11,158 +11,138 @@ Use this skill to download monthly Tangerine transaction CSVs for any account ty
 
 - Chrome CDP skill: `/home/nicolas/.pi/agent/git/github.com/pasky/chrome-cdp-skill/skills/chrome-cdp/SKILL.md`
 
-## Key finding: direct URL works for ALL accounts
+## Key findings
 
-The direct download API works for **all account types** when using `acctType=SAVINGS`:
+### Direct URL API — good for bank accounts, limited for credit cards
+
+The direct download API works for all account types but has an important limitation for credit cards:
 
 ```
 https://secure.tangerine.ca/web/rest/v1/accounts/downloads?
   ac=<PREFIX><ACCOUNT_TOKEN>&
   fileType=CSV&
   language=fra&
-  acctType=SAVINGS&    ← Use SAVINGS for checking AND savings accounts!
-  acctName=<DISPLAY_NAME>&
+  acctType=SAVINGS&     ← checking AND savings
+  acctType=CREDITLINE   ← credit cards
+  acctName=<NAME>&
   startDate=<YYYYMMDD>&
   endDate=<YYYYMMDD>
 ```
 
-- `ac` = `31323334353637383930313233343536` + 64-char hex token (checking/savings) or 96-char (credit cards)
-- `acctType=SAVINGS` works for both CHEQUING and SAVINGS account types
-- `acctType=CREDITLINE` for credit cards
-- `acctName` = account nickname (e.g., "Nicolas 166") or display name (e.g., "5360 xxxx xxxx 8499")
-- `startDate`/`endDate` = exclusive date range in `YYYYMMDD` format
-- Response: 200 with CSV data if transactions exist, 204 No Content if empty
+- **Bank accounts**: date ranges work correctly, monthly windows return proper data
+- **Credit cards**: **ignores date range**, always returns latest ~30-48 transactions. Only useful for current/partial month.
 
-## Getting account tokens
+### Credit card workflow: merge API + statements UI
 
-Use the PFM API (requires browser cookies/session):
+For credit cards, a full year requires merging multiple sources:
+
+1. **Statements UI** → "Excel" format = CSV (for older months)
+2. **API download** → latest ~30 txns (for current/partial month)
+3. **Deduplicate** by full line, **group by transaction date**, save monthly `YYYY-MM.csv`
+
+### Getting account tokens
 
 ```javascript
 fetch('https://secure.tangerine.ca/web/rest/pfm/v1/accounts', {credentials: 'include'})
   .then(r => r.json())
-  .then(d => d.accounts.map(a => ({
-    nickname: a.nickname,
-    number: a.number,  // Full ac token
-    displayName: a.display_name,
-    type: a.type
-  })))
+  .then(d => d.accounts.map(a => ({ nickname: a.nickname, number: a.number, displayName: a.display_name, type: a.type })))
 ```
 
-The `number` field is the full `ac` parameter value.
+## Credit card accounts
 
-## Downloading monthly files via browser fetch
+### MC 8499 (active)
 
-Since the API requires authentication cookies, fetch from within the Tangerine browser tab:
+- **Folder**: `/home/nicolas/Documents/Finances/Cartes de crédit/MasterCard Tangerine Nicolas 4402,4130,4326,8499/`
+- **Token**: `31323334353637383930313233343536b7088e2f70631d8f9d067f3a817429c8bd54be100b54dbf5758c94cda18af14f`
+- **acctType**: `CREDITLINE`
+- **Statement files**: `../<YEAR>/YYYY-MM-DD.csv` (e.g. `2025/2026-01-21.csv`, `2025/2026-02-21.csv`)
 
-```javascript
-(async () => {
-  const BASE = "https://secure.tangerine.ca/web/rest/v1/accounts/downloads";
-  const params = new URLSearchParams({
-    ac: "<FULL_ACCOUNT_TOKEN>",
-    fileType: "CSV",
-    language: "fra",
-    acctType: "SAVINGS",  // or CREDITLINE for credit cards
-    acctName: "<ACCOUNT_NAME>",
-    startDate: "20250101",
-    endDate: "20250201"    // Exclusive: Jan 1-31
-  });
-  const resp = await fetch(BASE + "?" + params, {credentials: "include"});
-  const csvText = await resp.text();
-  // csvText contains the CSV data
-})();
-```
+### MC 1194 (active)
 
-### Batch download pattern
+- **Token**: `313233343536373839303132333435363bba3e9f146d416bc1af24fe5e6f18170231e5fb2505044a2afe4194683ad738`
 
-Fetch all months, store in window object, then extract:
+### Credit card: download statements via UI ("Excel" = CSV)
 
-```javascript
-// 1. Fetch all months
-const months = [
-  ["20250101","20250201","2025-01"],
-  ["20250201","20250301","2025-02"],
-  // ... etc
-];
+For months older than the API's ~30-tx window:
 
-const results = [];
-for (const [start, end, label] of months) {
-  const r = await fetch(url, {credentials: "include"});
-  const t = await r.text();
-  if (t.trim().split("\n").length > 1) {  // Has data beyond header
-    results.push({file: label + ".csv", data: t});
-  }
-}
-window.__downloadResults = results;
+1. Navigate to `/app/transactions` in Tangerine browser tab
+2. Click **"Opération de la carte de crédit"** 
+3. Click **"Télécharger"** (top right)
+4. Set date range: **"Personnalisé"**, adjust Du/Au
+5. Change format dropdown from PDF → **Excel** (despite the name, this downloads a **CSV** with header `Date de l'opération,Transaction,Nom,Description,Montant`)
+6. Click blue **Télécharger** button
+7. File saves to browser Downloads
 
-// 2. Extract each file via CDP eval and save via shell
+Then rename to `YYYY-MM-DD.csv` and save to the appropriate `../<YEAR>/` folder.
+
+### Credit card: merge all sources into monthly files
+
+```python
+# 1. Collect all CSV files (statements + API downloads)
+# 2. Read all data deduplicating by full line
+# 3. Extract transaction month from first column (MM/DD/YYYY → YYYY-MM)
+# 4. Group by month, write to 2026/YYYY-MM.csv
+# 5. Report coverage: dates per month, gaps
 ```
 
 ## Folder structure
 
+### Bank accounts
 ```
 /home/nicolas/Documents/Finances/Banque/Tangerine/
 ├── Nicolas 166 8166/
 │   ├── 2025-01.csv
-│   ├── 2025-02.csv
 │   └── ...
-├── Dépenses variables 8227/
-│   ├── 2025-01.csv
+└── Dépenses variables 8227/
+    └── ...
+```
+
+### Credit cards
+```
+Cartes de crédit/MasterCard Tangerine Nicolas 4402,4130,4326,8499/
+├── 2025/
+│   ├── 2025-01.pdf          ← statement PDF (archive)
+│   ├── 2025-12-21.csv       ← "Excel" download = CSV (source data)
+│   ├── 2026-01-21.csv       ← statement covering Dec-Jan
+│   └── 2026-02-21.csv       ← statement covering Feb-Mar
+├── 2026/
+│   ├── 2026-01.csv          ← merged monthly file
+│   ├── 2026-02.csv
 │   └── ...
-├── Épargne 7270/
-│   └── README.txt  (if no transactions)
-└── ...
+├── 2016/ ... 2024/          ← older year folders
+└── download.js              ← legacy UI automation (old 4326 card)
 ```
 
 ## Naming conventions
 
-### Folder: `<Nickname> <Last4Digits>`
-- `Nicolas 166 8166/`
-- `Dépenses variables 8227/`
-- `Épargne 7270/`
-- `World Mastercard 8499/` (for credit cards)
+### Files
+- **Monthly merged**: `YYYY-MM.csv` (final organized file)
+- **Statement source**: `YYYY-MM-DD.csv` (downloaded PDF→Excel with date stamp)
+- **Header**: `Date de l'opération,Transaction,Nom,Description,Montant`
 
-### File: `YYYY-MM.csv`
-- Period: Jan 1-31 → `2025-01.csv`
-- Period: Feb 1-28 → `2025-02.csv`
-- Date range is exclusive endDate: `startDate=20250101&endDate=20250201` = January
+### Folder naming
+- Bank: `<Nickname> <Last4Digits>` (e.g., `Nicolas 166 8166/`)
+- Credit card: full descriptive name (e.g., `MasterCard Tangerine Nicolas 4402,4130,4326,8499/`)
 
-## Workflow summary
+## Known bank accounts (as of March 2025)
 
-1. Get account list via PFM API
-2. For each account, for each month:
-   - Fetch CSV via direct URL from browser
-   - If data exists (more than header), save to `<Folder>/<YYYY-MM>.csv`
-3. Empty accounts get a README.txt explaining no transactions
-
-## Date ranges for monthly downloads
-
-```python
-MONTHS = [
-    ("20250101", "20250201", "2025-01"),  # January 2025
-    ("20250201", "20250301", "2025-02"),  # February 2025
-    ("20250301", "20250401", "2025-03"),  # March 2025
-    # ... continue as needed
-]
-```
-
-## Known accounts (as of March 2025)
-
-| Nickname | Last 4 | Type | Token suffix |
-|----------|--------|------|--------------|
-| Nicolas 166 | 8166 | CHEQUING | 106d44b9... |
-| Dépenses variables | 8227 | CHEQUING | 31759a07... |
-| Épargne | 7270 | SAVINGS | 0e7763c2... |
-| Vacances | 9143 | SAVINGS | 5e175190... |
-| Nicolas | 2609 | SAVINGS | 5b918996... |
-| Étincelles | 0728 | SAVINGS | 342d5f9c... |
-| Maëva | 5130 | SAVINGS | db5f9c72... |
-| Coralie | 5161 | SAVINGS | dd37afa0... |
-| World MC Remises | 8499 | CREDIT_CARD | b7088e2f... |
-| World MC Remises | 1194 | CREDIT_CARD | 3bba3e9f... |
+| Nickname | Last 4 | Type | acctType | Token suffix |
+|----------|--------|------|----------|-------------|
+| Nicolas 166 | 8166 | CHEQUING | SAVINGS | 106d44b9... |
+| Dépenses variables | 8227 | CHEQUING | SAVINGS | 31759a07... |
+| Épargne | 7270 | SAVINGS | SAVINGS | 0e7763c2... |
+| Vacances | 9143 | SAVINGS | SAVINGS | 5e175190... |
+| Nicolas | 2609 | SAVINGS | SAVINGS | 5b918996... |
+| Étincelles | 0728 | SAVINGS | SAVINGS | 342d5f9c... |
+| Maëva | 5130 | SAVINGS | SAVINGS | db5f9c72... |
+| Coralie | 5161 | SAVINGS | SAVINGS | dd37afa0... |
 
 ## Notes
 
 - Don't sleep more than 5s between operations
-- Fetch + save approach is fastest (no UI interaction needed)
-- The API returns 204 No Content for months with no transactions
-- Credit cards use `acctType=CREDITLINE`, all others use `acctType=SAVINGS`
+- Fetch + save (no UI) is fastest for bank accounts
+- Credit card API returns 204 No Content for empty months, but ignores date range
+- Credit card statements become available ~mid-next-month after billing cycle
+- **Important**: "Excel" format in the statements UI actually downloads CSV, not XLSX
+- Always deduplicate merged data by full line
+- Dates in CSV are `MM/DD/YYYY` format, French labels
