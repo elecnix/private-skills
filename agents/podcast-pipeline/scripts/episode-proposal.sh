@@ -1,5 +1,5 @@
 #!/bin/bash
-# episode-proposal.sh — Helper script for lecture-episode-selector
+# episode-proposal.sh — Helper script for podcast-program-director
 # Manages tmp files for iterative proposal refinement
 
 set -euo pipefail
@@ -15,30 +15,22 @@ Usage: episode-proposal.sh <command> [args...]
 Commands:
   init                      Create working directory
   add-candidate <json>      Add candidate idea from TickTick
-  add-candidates <json>      Add multiple candidates (newline-delimited JSON)
+  add-candidates <json>    Add multiple candidates (newline-delimited JSON)
   set-existing              Append existing episode ledger
   run-refine                Run proposal-refiner subagent
   present                   Print current proposal for user review
   apply-feedback <text>     Add user feedback and re-run refine
   get-proposal              Output proposal path
+  get-candidates            Output candidates path
+  get-feedback              Output feedback path
   cleanup                   Remove working directory
-
-Examples:
-  episode-proposal.sh init
-  tickrs task list --project-id 639b3e518f08b7851bff5500 --status incomplete --json \
-    | jq -c '.data[]' \
-    | episode-proposal.sh add-candidates
-  episode-proposal.sh run-refine
-  episode-proposal.sh present
-  episode-proposal.sh apply-feedback "Merge 1+2, drop 3"
-  episode-proposal.sh cleanup
 
 EOF
 }
 
 # ─── Init ───
 do_init() {
-  WORK_DIR=$(mktemp -d /tmp/episode-proposal-XXXXXX)
+  WORK_DIR=$(mktemp -d /tmp/podcast-proposal-XXXXXX)
   echo "$WORK_DIR"
   
   # Create base files
@@ -125,8 +117,8 @@ do_set_existing() {
 
 HEADER
 
-  if [ -f "$HOME/Documents/Lecture/episode-ledger.jsonl" ]; then
-    cat "$HOME/Documents/Lecture/episode-ledger.jsonl" >> "$WORK_DIR/candidates.md"
+  if [ -f "$HOME/Documents/Podcast/Interesting/episode-ledger.jsonl" ]; then
+    cat "$HOME/Documents/Podcast/Interesting/episode-ledger.jsonl" >> "$WORK_DIR/candidates.md"
   fi
   
   echo "Added existing episode ledger"
@@ -145,10 +137,6 @@ do_run_refine() {
   
   echo "Refining $n_candidates candidates against $n_existing existing episodes..."
   
-  # Run the subagent
-  # Note: The parent agent handles the actual subagent call
-  # This script just prepares the context
-  
   # Update proposal header
   cat > "$WORK_DIR/proposal.md" << EOF
 # Episode Proposal
@@ -157,11 +145,11 @@ do_run_refine() {
 *Candidates: $n_candidates*
 *Existing episodes: $n_existing*
 
-*Run 'episode-proposal.sh run-refine' via the parent agent's subagent call...*
+*Run proposal-refiner via the parent agent's subagent call...*
 
 EOF
   
-  echo "Prepared for refinement. Parent agent should call proposal-refiner subagent."
+  echo "Prepared for refinement. Parent agent should call podcast-story-editor subagent."
 }
 
 # ─── Present proposal ───
@@ -197,10 +185,10 @@ $feedback
 
 EOF
   
-  echo "Feedback recorded. Run 'run-refine' to apply."
+  echo "Feedback recorded."
 }
 
-# ─── Get proposal path ───
+# ─── Get paths ───
 do_get_proposal() {
   if [ -z "${WORK_DIR:-}" ]; then
     echo "Error: No working directory. Run 'init' first." >&2
@@ -209,7 +197,6 @@ do_get_proposal() {
   echo "$WORK_DIR/proposal.md"
 }
 
-# ─── Get candidates path ───
 do_get_candidates() {
   if [ -z "${WORK_DIR:-}" ]; then
     echo "Error: No working directory. Run 'init' first." >&2
@@ -218,7 +205,6 @@ do_get_candidates() {
   echo "$WORK_DIR/candidates.md"
 }
 
-# ─── Get feedback path ───
 do_get_feedback() {
   if [ -z "${WORK_DIR:-}" ]; then
     echo "Error: No working directory. Run 'init' first." >&2
