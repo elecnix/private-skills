@@ -31,8 +31,8 @@ bash ~/Source/private-skills/lecture-pipeline/scripts/generate-description.sh \
 
 ### One-time setup (already done)
 - **Google Cloud Project:** home-assistant-729120 (YouTube Data API v3 enabled)
-- **OAuth Client:** `YOUR_CLIENT_ID.apps.googleusercontent.com` (see client_secret JSON file)
-- **Client Secret File:** `~/Téléchargements/client_secret_YOUR_CLIENT_ID.apps.googleusercontent.com.json`
+- **Credentials Config:** `~/.config/youtube-publisher-config.json` — contains `client_id` and `client_secret`
+- **Saved OAuth Tokens:** `~/.config/youtube-credentials.json` — contains `refresh_token` (never commit this!)
 - **Saved Credentials:** `/home/nicolas/.config/youtube-credentials.json`
 
 ### Required OAuth scopes
@@ -47,7 +47,10 @@ If token is missing `youtube.force-ssl`, re-authenticate:
 
 ```python
 import urllib.parse
-CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com"
+import json
+with open('/home/nicolas/.config/youtube-publisher-config.json') as f:
+    cfg = json.load(f)
+CLIENT_ID = cfg['client_id']
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube", "https://www.googleapis.com/auth/youtube.force-ssl"]
 params = {"response_type": "code", "client_id": CLIENT_ID, "redirect_uri": "urn:ietf:wg:oauth:2.0:oob", "scope": " ".join(SCOPES), "access_type": "offline", "prompt": "consent"}
 url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
@@ -58,8 +61,8 @@ After authorizing, exchange the code:
 ```bash
 curl -s -X POST "https://oauth2.googleapis.com/token" \
   -d "code=$AUTH_CODE" \
-  -d "client_id=YOUR_CLIENT_ID.apps.googleusercontent.com" \
-  -d "client_secret=YOUR_CLIENT_SECRET" \
+  -d "client_id=$(python3 -c \"import json; print(json.load(open('/home/nicolas/.config/youtube-publisher-config.json'))['client_id'])\")" \
+  -d "client_secret=$(python3 -c \"import json; print(json.load(open('/home/nicolas/.config/youtube-publisher-config.json'))['client_secret'])\")" \
   -d "redirect_uri=urn:ietf:wg:oauth:2.0:oob" \
   -d "grant_type=authorization_code"
 ```
