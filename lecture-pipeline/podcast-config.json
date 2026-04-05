@@ -1,0 +1,17 @@
+{
+  "show_title": "That's Interesting Stuff",
+  "tagline": "Signals from the noise.",
+  "short_description": "AI-generated audio explorations of the most interesting ideas in technology, psychology, and human potential. Curated from the deep reading list — articles, books, research, and conversations most people scroll past.",
+  "long_description": "That's Interesting Stuff is a self-hosted, AI-generated podcast that turns your curated reading list into audio essays. Every episode distills fascinating ideas from articles, books, research papers, and conversations that most people scroll past — into a focused, narrative-driven deep dive.\n\nThe show covers technology, artificial intelligence, psychology, productivity, and the hidden patterns that shape how we think and work. One idea per episode. No filler. No guest interviews. No sponsors. Just the signal, pulled from the noise.\n\nHosted independently at nicolas.marchildon.net. Subscribe via RSS to listen on Apple Podcasts, Spotify, or any podcast app.",
+  "language": "en",
+  "category_1": "Technology",
+  "category_2": "Society & Culture",
+  "explicit": false,
+  "episode_type": "episodic",
+  "copyright": "© 2026 Nicolas Marchildon",
+  "owner_name": "Nicolas Marchildon",
+  "owner_email": "nicolas@marchildon.net",
+  "website": "https://nicolas.marchildon.net/interesting/",
+  "rss_feed_url": "https://nicolas.marchildon.net/interesting/podcast/feed.xml",
+  "cover_art_url": "https://nicolas.marchildon.net/interesting/podcast/images/cover.png"
+}
