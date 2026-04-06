@@ -1,7 +1,7 @@
 ---
 name: podcast-publisher
 description: Create structured Craft knowledge base entries from processed Lecture content. Links everything together with internal references.
-tools: bash, edit, write, read
+tools: read, bash, edit, write, find, grep, ls, subagent
 thinking: low
 model: ollama/gemini-3-flash-preview:cloud
 skills: craft

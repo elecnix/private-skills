@@ -18,7 +18,7 @@ import re
 from datetime import datetime, timezone
 
 # ─── Configuration ───
-LECTURE_ROOT = "/home/nicolas/Documents/Lecture/That's Interesting Stuff"
+LECTURE_ROOT = "/home/nicolas/Documents/Podcast/Interesting/Episodes"
 PODCAST_BASE = "/home/nicolas/Documents/Site Web/synology/nicolas.marchildon.net/interesting/podcast"
 EPISODES_DIR = os.path.join(PODCAST_BASE, "episodes")
 IMAGES_DIR = os.path.join(PODCAST_BASE, "images")

@@ -102,10 +102,12 @@ def main():
             dur = sec['dur'] / n if n > 0 else sec['dur']
             for vi, v in enumerate(valid):
                 rel = os.path.relpath(v, d) if os.path.isabs(v) else v
-                f.write("file '{}'\n".format(rel))
-                f.write("duration {:.1f}\n".format(dur))
+                # Escape single quotes for ffmpeg concat file
+                rel_escaped = rel.replace("'", "'\\''")
+                f.write("file '{}'\n".format(rel_escaped))
+                f.write("duration {:.3f}\n".format(dur))
                 if vi == n - 1:
-                    f.write("file '{}'\n".format(rel))
+                    f.write("file '{}'\n".format(rel_escaped))
                     f.write("duration 0.5\n")
 
     os.makedirs(os.path.join(link, "output"), exist_ok=True)

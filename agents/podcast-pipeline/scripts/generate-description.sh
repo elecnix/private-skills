@@ -19,7 +19,7 @@ TOPIC_DIR="${1:?Usage: generate-description.sh <topic_dir> [source_url]}"
 SOURCE_URL="${2:-}"
 SCRIPT="$TOPIC_DIR/03-podcast-script.md"
 NOTES="$TOPIC_DIR/01-research-notes.md"
-SRT="$TOPIC_DIR/sources/source.en.srt"
+SRT="$TOPIC_DIR/audio/podcast.srt"
 OUTDIR="$TOPIC_DIR/output"
 mkdir -p "$OUTDIR"
 
@@ -51,7 +51,7 @@ if os.path.exists(srt_path):
         duration_secs = h * 3600 + m * 60 + s
 
 # Parse podcast sections (Hook + Sections 1-4 + Closing)
-sections = re.split(r'\n## (.+)\n', script)
+sections = re.split(r'\n(?:## |\[)(.+?)(?:\n|\]\n)', script)
 titles = sections[1::2]
 bodies = sections[2::2]
 
@@ -108,11 +108,10 @@ for key, refs in known_refs.items():
             ref_lines.append(f"• {name}: {url}")
 
 # Also grab any URLs from notes (research links)
-if os.path.exists(srt_path.replace('/sources/', '/').replace('source.en.srt', '')):
-    urls_in_notes = re.findall(r'(https?://[^\s,\)]+)', notes)
-    for url in urls_in_notes:
-        if not any(url in r for r in ref_lines):
-            ref_lines.append(f"• {url}")
+urls_in_notes = re.findall(r'(https?://[^\s,\)]+)', notes)
+for url in urls_in_notes:
+    if not any(url in r for r in ref_lines):
+        ref_lines.append(f"• {url}")
 
 # ── Assemble final description ────────────────────────────────────────────
 parts = []

@@ -1,7 +1,7 @@
 ---
 name: podcast-story-editor
 description: Analyzes episode candidates and proposes orthogonal groupings with compelling hooks. Used iteratively by podcast-program-director with different focus areas per pass.
-tools: bash
+tools: read, bash, edit, write, find, grep, ls, subagent
 thinking: high
 model: ollama/gemini-3-flash-preview:cloud
 skills: tickrs
@@ -47,14 +47,14 @@ The parent agent specifies your focus for this pass. Apply it:
 
 ## Your Task
 
-### Step 1: Analyze Candidates
+### Step 1: Analyze Candidates vs Existing Content (CRITICAL)
 
-For each candidate:
-- Extract core themes (what is this REALLY about?)
-- Identify the unique angle (why hasn't this been covered?)
-- Note the production context (is this ready? needs more research?)
+Before grouping, read the list of existing episodes provided in `candidates.md` (or from `find` results).
+- Identify titles that are too similar: "Jira/Linear" vs "SDLC tools", "Transformers" vs "LLM architecture".
+- If a candidate covers a topic already produced, mark it as **REJECTED (Overlap)**.
+- DO NOT propose an episode that has ≥ 50% conceptual overlap with existing ones.
 
-### Step 2: Find Overlaps (Pass A focus)
+### Step 2: Find Overlaps between candidates ...
 
 Look for candidates that cover similar:
 - Sources (same URLs)

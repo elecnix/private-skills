@@ -225,6 +225,11 @@ do_cleanup() {
 COMMAND="${1:-}"
 WORK_DIR="${EPISODE_PROPOSAL_DIR:-}"
 
+# Fallback to current directory if it looks like a proposal dir
+if [ -z "$WORK_DIR" ] && [ -f "./candidates.md" ]; then
+  WORK_DIR="."
+fi
+
 case "$COMMAND" in
   init)
     do_init

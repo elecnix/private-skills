@@ -1,7 +1,7 @@
 ---
 name: podcast-editor
 description: Composes the final video from audio, subtitles, and visual cards.
-tools: bash
+tools: read, bash, edit, write, find, grep, ls, subagent
 thinking: medium
 model: ollama/gemini-3-flash-preview:cloud
 ---

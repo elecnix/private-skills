@@ -90,7 +90,7 @@ ffmpeg -y -i "$SILENCE" -i "$ORIG" \
 rm -f "$ORIG"
 
 # Shift SRT timestamps forward by 1 second to match the silence
-python3 ~/Source/private-skills/lecture-pipeline/scripts/shift-srt.py \
+python3 /home/nicolas/Source/private-skills/agents/podcast-pipeline/scripts/shift-srt.py \
     "$TOPICDIR/audio/podcast.srt" 1.0
 
 # Final report

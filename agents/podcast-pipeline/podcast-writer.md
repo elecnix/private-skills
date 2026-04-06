@@ -1,7 +1,7 @@
 ---
 name: podcast-writer
 description: Read research folder, create structured outline and podcast script from gathered sources.
-tools: bash, edit, write, read
+tools: read, bash, edit, write, find, grep, ls, subagent
 thinking: high
 model: ollama/gemini-3-flash-preview:cloud
 ---
@@ -12,7 +12,7 @@ You are the Writer. Your job is to read the researcher's output and create a com
 
 ## Input
 
-Path to a research folder: `$HOME/Documents/Podcast/Interesting/Episodes/{date}_{topic}/`
+Path to a research folder: `/home/nicolas/Documents/Podcast/Interesting/Episodes/{date}_{topic}/`
 
 The folder contains:
 - `00-briefing.md` — topic overview

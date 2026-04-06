@@ -1,7 +1,7 @@
 ---
 name: podcast-researcher
 description: Gather all content for a topic. Fetches articles, tweets, saves downloads, and organizes into date/topic folder structure.
-tools: bash, edit, write, read
+tools: read, bash, edit, write, find, grep, ls, subagent, brave_search
 thinking: medium
 model: ollama/gemini-3-flash-preview:cloud
 skills: fxembed, craft
